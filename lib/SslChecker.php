@@ -135,8 +135,7 @@ class SslChecker {
         $intNumErrors = $this->arrMsgCounts[$cert]['error'];
         $intNumWarnings = $this->arrMsgCounts[$cert]['warn'];
 
-        $this->log('error', "{$strPrefix} Validation failed!");
-        $this->log('error', "{$strPrefix} {$intNumErrors} error(s), {$intNumWarnings} warning(s)");
+        $this->log('error', "{$strPrefix} Validation failed! {$intNumErrors} error(s), {$intNumWarnings} warning(s)");
       } else {
         $this->log('success', "{$strPrefix} Validation successful!");
       }

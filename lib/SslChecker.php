@@ -81,9 +81,9 @@ class SslChecker extends PhpCli {
 
           $this->debug("{$strPrefix} Validating file: {$strFilename}");
 
-          $strHash = $this->cmd("openssl {$strType} -noout -modulus -in {$strFile} | openssl md5", $strPrefix);
+          $strHash = md5($this->cmd("openssl {$strType} -noout -modulus -in {$strFile}", $strPrefix));
 
-          $this->debug("{$strPrefix}  Modulus: '{$strHash}'");
+          $this->debug("{$strPrefix} Modulus: '{$strHash}'");
 
           if ($strModulus === false) {
             $strModulus = $strHash;
@@ -114,9 +114,9 @@ class SslChecker extends PhpCli {
                     $this->error("{$strPrefix} Not active until: '{$strLocal}'");
                   } else if ($strKey === 'notAfter' && (TIME_NOW > $intStamp)) {
                   	$intNumErrors++;
-                    $this->error("{$strPrefix} Date is out of range! -> '{$strKey}' = '{$strDate}' (Local: '{$strLocal}')");
+                    $this->error("{$strPrefix} Not actie since: '{$strLocal}'");
                   } else {
-                    $this->debug("{$strPrefix} Not active since: '{$strLocal}'");
+                    $this->debug("{$strPrefix} Cert is valid '{$strKey}' '{$strLocal}'");
                   }
                 } else {
                 	$intNumErrors++;

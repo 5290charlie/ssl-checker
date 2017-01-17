@@ -3,10 +3,5 @@
 
 require dirname(__FILE__) . '/../lib/SslChecker.php';
 
-$checker = new SslChecker();
-
-if ($argc > 1) {
-	$checker->validate($argv[1]);
-} else {
-	die("USAGE: {$argv[0]} <ssl-directory>\n");
-}
+$checker = new SslChecker($argv);
+$checker->run();

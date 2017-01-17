@@ -7,7 +7,7 @@ Validate SSL request, certificate, &amp; key files (verify both modulus &amp; da
 - Must have php executable: `/usr/bin/php`
 - Script can be executed relative to this path:
 	- `$ ./path/to/ssl-checker/bin/ssl-checker <directory-to-check>`
-- Or, can be linked to be visible in `PATH`
+- Or, can be linked to be visible in `PATH` (`install.sh` does this)
 	- `$ sudo ln -s ./path/to/ssl-checker/bin/ssl-checker /usr/local/bin/ssl-checker`
 	- `$ ssl-checker <directory-to-check>`
 

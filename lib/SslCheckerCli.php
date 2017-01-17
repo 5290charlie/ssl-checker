@@ -7,7 +7,8 @@ class SslCheckerCli extends PhpCli {
 	protected $arrAllowed = [
 		'directory' => [
 			'type' => 'directory',
-			'default' => '.'
+			'default' => '.',
+      'description' => 'Directory to scan for SSL cert files to be verified'
 		]
 	];
 

@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 
-require dirname(__FILE__) . '/../lib/SslCheckerCli.php';
+require dirname(__FILE__) . '/../lib/SslChecker.php';
 
-$checker = new SslCheckerCli($argv);
+$checker = new SslChecker($argv);
 $checker->run();

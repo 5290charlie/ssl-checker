@@ -1,16 +1,18 @@
 <?php
 
-date_default_timezone_set('America/Denver');
+require dirname(__FILE__) . '/php-cli/lib/PhpCli.php';
 
-defined('TIME_NOW') or define('TIME_NOW', time());
-defined('DATE_FORMAT') or define('DATE_FORMAT', 'Y-m-d H:i:s');
+class SslChecker extends PhpCli {
+	protected $strVersion = '1.0.0';
+	protected $arrAllowed = [
+		'directory' => [
+			'type' => 'directory',
+			'default' => '.',
+      'description' => 'Directory to scan for SSL cert files to be verified'
+		]
+	];
 
-require dirname(__FILE__) . '/Colors.php';
-
-class SslChecker {
-  private $blnVerbose = false;
-  private $objColors = null;
-  private $arrCerts = [];
+	private $arrCerts = [];
   private $arrMsgCounts = [];
   private $arrExtTypes = [
     'bundle' => 'x509',
@@ -19,19 +21,11 @@ class SslChecker {
     'key' => 'rsa'
   ];
 
-  private $arrMsgTypeColors = [
-    'log' => 'white', 
-    'warn' => 'yellow',
-    'error' => 'red',
-    'debug' => 'cyan',
-    'success' => 'green'
-  ];
+	public function run() {
+		$this->validate($this->getOption('directory'));
+	}
 
-  public function __construct() {
-    $this->objColors = new Colors2();
-  }
-
-  public function validate($strDir) {
+	public function validate($strDir) {
     $this->loadCertList($strDir);
     $this->processCerts();
   }
@@ -44,134 +38,116 @@ class SslChecker {
     if (is_dir($strDir)) {
       $arrExtensions = array_keys($this->arrExtTypes);
 
-      $this->log('debug', "Scanning directory: {$strDir} for files: '*." . implode(', *.', $arrExtensions));
+      $this->debug("Scanning directory: {$strDir} for files: '*." . implode(', *.', $arrExtensions));
 
       foreach (scandir($strDir) as $strFile) {
         if ($strFile != '.' && $strFile != '..') {
-          $info = pathinfo($strFile);
+          $arrInfo = pathinfo($strFile);
 
-          $cert = isset($info['filename']) ? $info['filename'] : '';
-          $ext = isset($info['extension']) ? $info['extension'] : '';
+          $strCert = isset($arrInfo['filename']) ? $arrInfo['filename'] : '';
+          $strExt = isset($arrInfo['extension']) ? $arrInfo['extension'] : '';
 
-          if (in_array($ext, $arrExtensions)) {
-            if (!isset($this->arrCerts[$cert])) {
-              $this->arrCerts[$cert] = [];
+          if (in_array($strExt, $arrExtensions)) {
+      			$strPrefix = "[{$strCert}]";
+
+            if (!isset($this->arrCerts[$strCert])) {
+              $this->arrCerts[$strCert] = [];
             }
 
-            $this->arrCerts[$cert][$ext] = $strDir . $strFile;
+            $this->arrCerts[$strCert][$strExt] = $strDir . $strFile;
 
-            $this->log('debug', "Loaded file: '{$strFile}' for cert: '{$cert}'");
+            $this->debug("{$strPrefix} Loaded file: '{$strFile}'");
           }
         }
       }
     } else {
-      $this->log('error', "'{$strDir}' is not a directory!");
+      $this->error("'{$strDir}' is not a directory!");
     }
   }
 
   private function processCerts() {
-    foreach ($this->arrCerts as $cert => $files) {
-      $this->resetMsgCounts($cert);
+    foreach ($this->arrCerts as $strCert => $arrFiles) {
+      $intNumErrors = 0;
+      $strModulus = false;
 
-      $hasError = false;
-      $modulus = false;
+      $strPrefix = "[{$strCert}]";
 
-      $strPrefix = "[{$cert}]";
+      $this->debug("{$strPrefix} Processing " . count($arrFiles) . " file(s)");
 
-      $this->log('debug', "{$strPrefix} Processing " . count($files) . " file(s)", $cert);
+      foreach ($arrFiles as $strExt => $strFile) {
+        if (isset($this->arrExtTypes[$strExt])) {
+	      	$strFilename = basename($strFile);
+          $strType = $this->arrExtTypes[$strExt];
 
-      foreach ($files as $ext => $file) {
-        if (isset($this->arrExtTypes[$ext])) {
-          $type = $this->arrExtTypes[$ext];
-          $hash = $this->cmd("openssl {$type} -noout -modulus -in {$file} | openssl md5");
+          $this->debug("{$strPrefix} Validating file: {$strFilename}");
 
-          if ($modulus === false) {
-            $modulus = $hash;
-            $this->log('debug', "{$strPrefix} Stored modulus: '{$modulus}' (from file: '{$file}')", $cert);
-          } else if ($modulus === $hash) {
-            $this->log('debug', "{$strPrefix} Modulus for file: '{$file}' matches expected: '{$modulus}'", $cert);
-          } else {
-            $this->log('error', "{$strPrefix} Modulus for file: '{$file}' '{$hash}' DOES NOT MATCH expected: '{$modulus}'", $cert);
+          $strHash = $this->cmd("openssl {$strType} -noout -modulus -in {$strFile} | openssl md5", $strPrefix);
+
+          $this->debug("{$strPrefix}  Modulus: '{$strHash}'");
+
+          if ($strModulus === false) {
+            $strModulus = $strHash;
+          } else if ($strModulus !== $strHash) {
+          	$intNumErrors++;
+            $this->error("{$strPrefix} Expected: '{$strModulus}'");
           }
 
-          if ($type === 'x509') {
-            $this->log('debug', "{$strPrefix} Checking date validity for cert file: '{$file}'", $cert);
+          if ($strType === 'x509') {
+            $strDates = $this->cmd("openssl {$strType} -noout -dates -in {$strFile}", $strPrefix);
 
-            $dates = $this->cmd("openssl {$type} -noout -dates -in {$file}");
-
-            $dateKeys = [
+            $strDateKeys = [
               'notBefore',
               'notAfter'
             ];
 
-            foreach ($dateKeys as $key) {
-              $regex = "/$key=(.*)(\\n)?/";
-              if (preg_match($regex, $dates, $matches)) {
-                if (count($matches) > 1) {
-                  $date = trim($matches[1]);
-                  $stamp = strtotime($date);
-                  $local = date('Y-m-d H:i:s', $stamp);
+            foreach ($strDateKeys as $strKey) {
+              $strRegex = "/$strKey=(.*)(\\n)?/";
 
-                  if (($key === 'notBefore' && (TIME_NOW < $stamp)) || ($key === 'notAfter' && (TIME_NOW > $stamp))) {
-                    $this->log('error', "{$strPrefix} Date is out of range! -> '{$key}' = '{$date}' (Local: '{$local}')", $cert);
+              if (preg_match($strRegex, $strDates, $arrMatches)) {
+                if (count($arrMatches) > 1) {
+                  $strDate = trim($arrMatches[1]);
+                  $intStamp = strtotime($strDate);
+                  $strLocal = date('Y-m-d H:i:s', $intStamp);
+
+                  if ($strKey === 'notBefore' && (TIME_NOW < $intStamp)) {
+										$intNumErrors++;
+                    $this->error("{$strPrefix} Not active until: '{$strLocal}'");
+                  } else if ($strKey === 'notAfter' && (TIME_NOW > $intStamp)) {
+                  	$intNumErrors++;
+                    $this->error("{$strPrefix} Date is out of range! -> '{$strKey}' = '{$strDate}' (Local: '{$strLocal}')");
                   } else {
-                    $this->log('debug', "{$strPrefix} Valid for date range: '{$key}' = '{$date}' (Local: '{$local}')", $cert);
+                    $this->debug("{$strPrefix} Not active since: '{$strLocal}'");
                   }
                 } else {
-                  $this->log('warn', "{$strPrefix} Unable to parse date key: '{$key}' from file: '{$file}'", $cert);
+                	$intNumErrors++;
+                  $this->error("{$strPrefix} Unable to parse date key: '{$strKey}' from file: '{$strFile}'");
                 }
               } else {
-                $this->log('warn', "{$strPrefix} No match for regex '$regex' in dates: $dates", $cert);
+              	$intNumErrors++;
+                $this->error("{$strPrefix} No match for regex '{$strRegex}' in dates: $strDates");
               }
             }
           }
         } else {
-          $this->log('warn', "{$strPrefix} No type to match extension: '{$ext}'", $cert);
+        	$intNumErrors++;
+          $this->error("{$strPrefix} No type to match extension: '{$strExt}'");
         }
       }
 
 
-      if ($this->arrMsgCounts[$cert]['error'] > 0 || $this->arrMsgCounts[$cert]['warn'] > 0) {
-        $intNumErrors = $this->arrMsgCounts[$cert]['error'];
-        $intNumWarnings = $this->arrMsgCounts[$cert]['warn'];
-
-        $this->log('error', "{$strPrefix} Validation failed! {$intNumErrors} error(s), {$intNumWarnings} warning(s)");
+      if ($intNumErrors > 0) {
+        $this->error("{$strPrefix} Validation failed! {$intNumErrors} error(s)");
       } else {
-        $this->log('success', "{$strPrefix} Validation successful!");
+        $this->success("{$strPrefix} Validation successful!");
       }
     }
   }
 
-  private function cmd($strCommand) {
+  private function cmd($strCommand, $strPrefix = '') {
     $strCommand = trim($strCommand);
 
-    $this->log('debug', "Running command: '{$strCommand}'");
+    $this->debug("{$strPrefix} Running command: '{$strCommand}'");
 
     return trim(`$strCommand`);
   }
-
-  private function log($strType, $strMsg, $strCert = null) {
-    $strType = trim(strtolower($strType));
-
-    if ($strType !== 'debug' || $this->blnVerbose) {
-      $strColor = isset($this->arrMsgTypeColors[$strType]) ? $this->arrMsgTypeColors[$strType] : null;
-      $strColored = $this->objColors->getColoredString(strtoupper($strType) . "\t| " . $strMsg, $strColor);
-
-      echo $strColored . PHP_EOL;
-    }
-
-    if ($strCert) {
-      $this->arrMsgCounts[$strCert][$strType]++;
-    }
-  }
-
-  private function resetMsgCounts($strCert) {
-    $this->arrMsgCounts[$strCert] = [];
-
-    foreach (array_keys($this->arrMsgTypeColors) as $strType) {
-      $this->arrMsgCounts[$strCert][$strType] = 0;
-    }
-  }
 }
-
-

@@ -26,8 +26,12 @@ class SslChecker extends PhpCli {
 	}
 
 	public function validate($strDir) {
-    $this->loadCertList($strDir);
-    $this->processCerts();
+    if (trim(`which openssl`) === '') {
+      $this->error("This script requires 'openssl' to obtain cert info");
+    } else {
+      $this->loadCertList($strDir);
+      $this->processCerts();
+    }
   }
 
   private function loadCertList($strDir) {

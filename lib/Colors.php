@@ -1,6 +1,6 @@
 <?php
 
-class Colors {
+class Colors2 {
 	private $foreground_colors = array();
 	private $background_colors = array();
 

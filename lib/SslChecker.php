@@ -2,8 +2,8 @@
 
 date_default_timezone_set('America/Denver');
 
-define('TIME_NOW', time());
-define('DATE_FORMAT', 'Y-m-d H:i:s');
+defined('TIME_NOW') or define('TIME_NOW', time());
+defined('DATE_FORMAT') or define('DATE_FORMAT', 'Y-m-d H:i:s');
 
 require dirname(__FILE__) . '/Colors.php';
 
@@ -28,7 +28,7 @@ class SslChecker {
   ];
 
   public function __construct() {
-    $this->objColors = new Colors();
+    $this->objColors = new Colors2();
   }
 
   public function validate($strDir) {
@@ -50,8 +50,8 @@ class SslChecker {
         if ($strFile != '.' && $strFile != '..') {
           $info = pathinfo($strFile);
 
-          $cert = $info['filename'];
-          $ext = $info['extension'];
+          $cert = isset($info['filename']) ? $info['filename'] : '';
+          $ext = isset($info['extension']) ? $info['extension'] : '';
 
           if (in_array($ext, $arrExtensions)) {
             if (!isset($this->arrCerts[$cert])) {

@@ -1,12 +1,7 @@
 #!/usr/bin/php
 <?php
 
-require dirname(__FILE__) . '/../lib/SslChecker.php';
+require dirname(__FILE__) . '/../lib/SslCheckerCli.php';
 
-$checker = new SslChecker();
-
-if ($argc > 1) {
-	$checker->validate($argv[1]);
-} else {
-	die("USAGE: {$argv[0]} <ssl-directory>\n");
-}
+$checker = new SslCheckerCli($argv);
+$checker->run();
